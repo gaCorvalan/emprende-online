@@ -2,6 +2,7 @@
 
 ## 2026-11-18
 
+- El catálogo usa la tarjeta v2 de Figma, con estados de stock y foto 1:1; el CMS actual entrega una sola imagen por producto.
 - El carrito muestra el subtotal de la línea cuando hay más de una unidad, y quedan el favicon, los títulos y la guía de datos.
 - El carrito arma el pedido y abre WhatsApp; si la tienda no cargó el número, el botón queda deshabilitado.
 - El carrito queda guardado en el navegador: aviso al agregar, contador y página para revisar el pedido. WhatsApp sigue para después.

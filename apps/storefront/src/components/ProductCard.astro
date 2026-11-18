@@ -15,42 +15,60 @@ const imageUrl =
   || product.image?.formats?.thumbnail?.url
   || product.image?.url
 
-const labelClass =
-  view.label === 'PIEZA ÚNICA' ? 'border border-borde-control bg-superficie text-texto'
-  : view.label === 'ÚLTIMA UNIDAD' ? 'bg-aviso-fondo text-aviso'
-  : view.label === 'SIN STOCK' ? 'bg-error-fondo text-error'
-  : ''
+const imageAlt = product.image?.alternativeText?.trim() || product.name
+const statusText =
+  view.label === 'PIEZA ÚNICA' ? 'Pieza única'
+  : view.label === 'ÚLTIMA UNIDAD' ? 'Última unidad'
+  : view.label === 'SIN STOCK' ? 'Sin stock'
+  : null
+const statusTextClass =
+  view.label === 'ÚLTIMA UNIDAD' ? 'text-aviso'
+  : view.label === 'SIN STOCK' ? 'text-error'
+  : 'text-texto'
+const statusDotClass =
+  view.label === 'ÚLTIMA UNIDAD' ? 'bg-aviso'
+  : view.label === 'SIN STOCK' ? 'bg-error'
+  : 'bg-texto'
 ---
 
-<a
-  href={`/productos/${product.slug}`}
-  class="flex h-full flex-col overflow-hidden rounded-medio bg-superficie shadow-1 no-underline"
->
-  <div class="relative aspect-square bg-superficie-hundida">
+<a href={`/productos/${product.slug}`} class="flex h-full flex-col no-underline">
+  <div
+    class="relative aspect-square overflow-hidden rounded-chico bg-superficie-hundida"
+    role={imageUrl ? 'group' : undefined}
+    aria-label={imageUrl ? 'Foto 1 de 1' : undefined}
+  >
     {imageUrl && (
       <img
         src={imageUrl}
-        alt=""
-        class="h-full w-full object-cover"
+        alt={imageAlt}
+        class:list={[
+          'h-full w-full object-cover',
+          view.label === 'SIN STOCK' && 'opacity-45',
+        ]}
         loading="lazy"
         decoding="async"
       />
     )}
-    {view.label && (
-      <span
-        class:list={[
-          'absolute left-2 top-2 inline-flex h-6 items-center rounded-chico px-2 texto-etiqueta-chica whitespace-nowrap',
-          labelClass,
-        ]}
-      >
-        {view.label}
-      </span>
-    )}
   </div>
-  <div class="flex flex-col gap-1 p-3">
-    <p class="texto-cuerpo line-clamp-2 text-texto">{product.name}</p>
-    <p class:list={['texto-precio', view.priceMuted ? 'text-texto-secundario' : 'text-texto']}>
+  <div class="flex w-full flex-col gap-1 overflow-hidden pt-3">
+    <p class="h-[40px] w-full overflow-hidden text-ellipsis text-[14px] leading-5 tracking-[-0.084px] line-clamp-2 font-texto text-texto">
+      {product.name}
+    </p>
+    <p
+      class:list={[
+        'text-[16px] leading-[22px] tracking-[-0.176px] font-texto font-semibold tabular-nums',
+        view.priceMuted ? 'text-texto-secundario' : 'text-texto',
+      ]}
+    >
       {view.priceText}
     </p>
+    <div class="flex h-4 w-full items-center overflow-hidden">
+      {statusText && (
+        <p class:list={['inline-flex items-center gap-[6px] text-[12px] leading-4 font-texto font-medium', statusTextClass]}>
+          <span class:list={['size-[6px] shrink-0 rounded-full', statusDotClass]} aria-hidden="true"></span>
+          {statusText}
+        </p>
+      )}
+    </div>
   </div>
 </a>
