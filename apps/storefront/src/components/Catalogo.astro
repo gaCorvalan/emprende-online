@@ -18,27 +18,44 @@ const { products, catalog, categories, shown, total, currentPage, lastPage } = A
 const prev = currentPage > 1 ? catalogPagePath(currentPage - 1) : undefined
 const next = currentPage < lastPage ? catalogPagePath(currentPage + 1) : undefined
 
+const categoryList = categoryChoices(categories).map((choice) => {
+  const source = categories.find((category) => category.slug === choice.slug)
+  const image = source?.image
+  const imageUrl =
+    image?.formats?.thumbnail?.url
+    || image?.formats?.small?.url
+    || image?.formats?.medium?.url
+    || image?.url
+
+  return {
+    ...choice,
+    imageUrl: imageUrl || null,
+    imageAlt: image?.alternativeText?.trim() || choice.name,
+  }
+})
+
 const datosJson = JSON.stringify({
   items: catalog.map((product) => toCatalogItem(product)),
-  categories: categoryChoices(categories),
+  categories: categoryList,
 }).replace(/</g, '\\u003c')
 ---
 
-<div class="flex flex-col gap-3 pt-3 pb-28" data-catalogo>
+<div
+  class="flex flex-col gap-3 pt-3 pb-28"
+  data-catalogo
+  style="--color-acento: #A3441C; --color-acento-suave: #F8ECE6;"
+>
   <form role="search" data-buscar-form>
     <label for="buscar-prendas" class="sr-only">Buscar prendas</label>
     <div class="relative">
-      <svg
+      <img
         class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-texto-secundario"
+        src="/filtro-v2/buscar.svg"
+        alt=""
         width="20"
         height="20"
-        viewBox="0 0 24 24"
-        fill="none"
         aria-hidden="true"
-      >
-        <circle cx="11" cy="11" r="6.25" stroke="currentColor" stroke-width="1.8"></circle>
-        <path d="M16 16L20 20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
-      </svg>
+      />
       <input
         id="buscar-prendas"
         name="q"
@@ -47,13 +64,46 @@ const datosJson = JSON.stringify({
         autocomplete="off"
         autocapitalize="off"
         data-buscar
-        class="h-minimo w-full rounded-medio border border-borde-control bg-superficie pl-10 pr-10 text-texto placeholder:text-texto-secundario"
+        class="h-12 w-full rounded-medio border-0 bg-superficie-hundida pl-10 pr-10 text-texto placeholder:text-texto-secundario"
       />
     </div>
   </form>
 
+  <nav
+    data-atajos
+    aria-label="Categorías"
+    class="flex gap-3 overflow-x-auto"
+    hidden={categoryList.length === 0}
+  >
+    {categoryList.map((category) => (
+      <button
+        type="button"
+        data-atajo={category.slug}
+        class="flex w-[72px] shrink-0 cursor-pointer flex-col items-center gap-[6px] text-texto"
+        aria-label={`Filtrar por ${category.name}`}
+      >
+        <span class="flex size-16 items-center justify-center overflow-hidden rounded-pastilla bg-superficie-hundida">
+          {category.imageUrl
+            ? (
+              <img
+                src={category.imageUrl}
+                alt={category.imageAlt}
+                class="h-full w-full object-cover"
+                loading="lazy"
+                decoding="async"
+              />
+            )
+            : <span class="texto-cuerpo-chico text-texto-secundario">foto</span>}
+        </span>
+        <span class="max-w-full overflow-hidden text-ellipsis whitespace-nowrap texto-cuerpo-chico">
+          {category.name}
+        </span>
+      </button>
+    ))}
+  </nav>
+
   <div data-chips hidden>
-    <div data-chips-lista class="flex flex-wrap items-center gap-2"></div>
+    <div data-chips-lista class="flex flex-nowrap items-center gap-2 overflow-x-auto"></div>
   </div>
 
   <div data-servidor>
@@ -61,7 +111,7 @@ const datosJson = JSON.stringify({
       <p class="texto-cuerpo-chico text-texto-secundario">{prendasLabel(total)}</p>
 
       {total > 0 && (
-        <ul class="grid list-none grid-cols-2 gap-4 p-0">
+        <ul class="grid list-none grid-cols-2 gap-x-4 gap-y-6 p-0">
           {products.map((product) => (
             <li class="min-w-0">
               <ProductCard product={product} />
@@ -97,84 +147,91 @@ const datosJson = JSON.stringify({
     <div class="flex flex-col gap-3">
       <p data-cuenta class="texto-cuerpo-chico text-texto-secundario" aria-live="polite"></p>
       <div data-grilla-wrap>
-        <ul data-grilla class="grid list-none grid-cols-2 gap-4 p-0"></ul>
+        <ul data-grilla class="grid list-none grid-cols-2 gap-x-4 gap-y-6 p-0"></ul>
       </div>
-      <div data-vacio hidden>
-        <div class="flex flex-col items-start gap-3 py-6" role="status">
-          <p class="texto-titulo text-texto">Sin resultados</p>
-          <p class="texto-cuerpo text-texto-secundario">Probá con otras palabras o sacá algún filtro.</p>
-          <button
-            type="button"
-            data-limpiar-todo
-            class="inline-flex min-h-minimo items-center rounded-medio bg-acento px-4 text-acento-texto texto-etiqueta"
-          >
-            Limpiar filtros
-          </button>
-        </div>
+      <p data-mostrando class="texto-cuerpo-chico text-center text-texto-secundario"></p>
+      <div data-vacio hidden class="flex flex-col items-center pt-10 text-center" role="status">
+        <p data-vacio-titulo class="texto-titulo text-texto"></p>
+        <p data-vacio-ayuda class="mt-3 texto-cuerpo text-texto-secundario"></p>
+        <button
+          type="button"
+          data-limpiar-todo
+          class="mt-8 inline-flex min-h-cta w-full items-center justify-center rounded-medio bg-acento px-4 texto-etiqueta text-acento-texto"
+        >
+          Ver todo el catálogo
+        </button>
       </div>
     </div>
   </div>
 
   <div class="pointer-events-none fixed inset-x-0 bottom-0 z-30">
-    <div class="contenedor pointer-events-auto pb-4">
+    <div class="contenedor pointer-events-auto pt-3 pb-4">
       <button
         type="button"
         data-abrir
-        class="flex min-h-cta w-full items-center justify-center rounded-medio bg-acento px-4 text-acento-texto texto-etiqueta shadow-2"
+        class="flex min-h-cta w-full items-center justify-center gap-2 rounded-medio bg-acento px-4 texto-etiqueta text-acento-texto shadow-2"
         aria-expanded="false"
         aria-controls="catalogo-dialog"
       >
-        Filtrar y ordenar
+        <img src="/filtro-v2/filtrar.svg" alt="" width="20" height="20" aria-hidden="true" />
+        <span>Filtrar y ordenar</span>
+        <span
+          data-filtros-cuenta
+          class="inline-flex size-6 items-center justify-center rounded-pastilla bg-superficie texto-cuerpo-chico text-acento"
+          hidden
+          aria-hidden="true"
+        ></span>
       </button>
     </div>
   </div>
 
-  <div data-panel hidden>
-    <div class="fixed inset-0 z-40 flex items-end">
-      <button
-        type="button"
-        data-fondo
-        class="absolute inset-0 bg-texto/40"
-        aria-label="Cerrar filtros"
-        tabindex="-1"
-      ></button>
-      <div
-        id="catalogo-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="catalogo-panel-titulo"
-        class="relative flex max-h-[85%] w-full flex-col overflow-hidden rounded-t-grande bg-superficie shadow-2"
-      >
-        <div class="flex shrink-0 items-center justify-between gap-3 px-4 pt-3">
-          <p id="catalogo-panel-titulo" class="texto-subtitulo text-texto">Filtrar y ordenar</p>
+  <div data-panel hidden class="fixed inset-0 z-40 flex items-end justify-center">
+    <button
+      type="button"
+      data-fondo
+      class="absolute inset-0 bg-texto/40"
+      aria-label="Cerrar filtros"
+      tabindex="-1"
+    ></button>
+    <div
+      id="catalogo-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="catalogo-panel-titulo"
+      class="relative z-10 flex h-[calc(100dvh-40px)] max-h-[804px] w-full max-w-[390px] flex-col overflow-hidden rounded-t-grande bg-superficie shadow-2"
+    >
+      <div class="shrink-0 border-b border-borde bg-superficie">
+        <div class="flex h-4 items-start justify-center pt-2" aria-hidden="true">
+          <span class="h-1 w-9 rounded-pastilla bg-borde"></span>
+        </div>
+        <div class="flex h-14 items-center gap-1 pl-4 pr-1">
+          <p id="catalogo-panel-titulo" class="flex-1 texto-subtitulo text-texto">Filtrar y ordenar</p>
           <button
             type="button"
             data-cerrar
-            class="inline-flex size-minimo shrink-0 items-center justify-center text-texto"
+            class="inline-flex size-11 shrink-0 items-center justify-center text-texto"
             aria-label="Cerrar"
           >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M6 6L18 18M18 6L6 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
-            </svg>
+            <img src="/filtro-v2/cerrar.svg" alt="" width="24" height="24" aria-hidden="true" />
           </button>
         </div>
-        <div data-opciones class="flex min-h-0 flex-col gap-6 overflow-y-auto px-4 py-4"></div>
-        <div class="flex shrink-0 gap-3 border-t border-borde px-4 py-4">
-          <button
-            type="button"
-            data-limpiar-panel
-            class="inline-flex min-h-minimo shrink-0 items-center justify-center rounded-medio border border-borde-control bg-superficie px-4 texto-etiqueta text-texto"
-          >
-            Limpiar
-          </button>
-          <button
-            type="button"
-            data-aplicar
-            class="inline-flex min-h-minimo flex-1 items-center justify-center rounded-medio bg-acento px-4 text-acento-texto texto-etiqueta"
-          >
-            Ver
-          </button>
-        </div>
+      </div>
+      <div data-opciones class="flex min-h-0 flex-1 flex-col overflow-y-auto px-4"></div>
+      <div class="flex shrink-0 gap-3 border-t border-borde bg-superficie px-4 pt-3 pb-4">
+        <button
+          type="button"
+          data-limpiar-panel
+          class="inline-flex min-h-cta w-[120px] shrink-0 items-center justify-center rounded-medio border border-acento bg-superficie px-4 texto-etiqueta text-acento"
+        >
+          Limpiar
+        </button>
+        <button
+          type="button"
+          data-aplicar
+          class="inline-flex min-h-cta flex-1 items-center justify-center rounded-medio bg-acento px-4 texto-etiqueta text-acento-texto"
+        >
+          Ver 0 prendas
+        </button>
       </div>
     </div>
   </div>

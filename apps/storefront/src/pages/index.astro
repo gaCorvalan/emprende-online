@@ -10,7 +10,7 @@ const slice = pageSlice(productos, 1)
 const nombre = (await getCollection('tienda'))[0]?.data.nombre.trim() || 'Tienda'
 ---
 
-<Base title={nombre} description={`Catálogo de ${nombre}.`}>
+<Base title={nombre} description={`Catálogo de ${nombre}.`} catalogo>
   <Catalogo
     products={slice.data.map((entry) => entry.data)}
     catalog={productos.map((entry) => entry.data)}

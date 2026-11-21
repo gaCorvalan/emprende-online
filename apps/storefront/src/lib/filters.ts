@@ -7,7 +7,7 @@
  */
 
 import { cardPrice } from './catalog.ts'
-import { productStatus, type ProductStatus, type StockVariant } from './stock.ts'
+import { formatArs, productStatus, totalStock, type ProductStatus, type StockVariant } from './stock.ts'
 
 export const CATALOG_SORTS = ['mas-nuevos', 'menor-precio', 'mayor-precio'] as const
 
@@ -24,6 +24,7 @@ export interface CatalogItem {
   name: string
   price: number
   status: ProductStatus
+  hasStock: boolean
   categorySlugs: string[]
   sizes: string[]
   colors: CatalogColor[]
@@ -36,7 +37,24 @@ export interface CatalogQuery {
   categorias: string[]
   talles: string[]
   colores: string[]
+  /** Identificador dinámico min-max derivado de los precios del catálogo. */
+  precio: string | null
+  soloConStock: boolean
   orden: CatalogSort
+}
+
+export interface CatalogPriceRange {
+  id: string
+  min: number
+  max: number | null
+  label: string
+}
+
+export interface CatalogOptionCounts {
+  categorias: Record<string, number>
+  talles: Record<string, number>
+  colores: Record<string, number>
+  precios: Record<string, number>
 }
 
 export interface CatalogItemSource {
@@ -60,7 +78,15 @@ export interface CatalogCategorySource {
 const HEX = /^#[0-9A-Fa-f]{6}$/
 
 export function emptyCatalogQuery(): CatalogQuery {
-  return { q: '', categorias: [], talles: [], colores: [], orden: 'mas-nuevos' }
+  return {
+    q: '',
+    categorias: [],
+    talles: [],
+    colores: [],
+    precio: null,
+    soloConStock: false,
+    orden: 'mas-nuevos',
+  }
 }
 
 /** Minúsculas, sin tildes, espacios de más afuera y adentro. */
@@ -75,6 +101,16 @@ export function normalizeText(value: string): string {
 
 export function isCatalogSort(value: string | null): value is CatalogSort {
   return CATALOG_SORTS.some((sort) => sort === value)
+}
+
+function parsePriceRangeId(value: string | null): { min: number, max: number | null } | null {
+  if (!value) return null
+  const match = /^(\d+)-(\d+|\*)$/.exec(value)
+  if (!match) return null
+  const min = Number(match[1])
+  const max = match[2] === '*' ? null : Number(match[2])
+  if (!Number.isSafeInteger(min) || (max !== null && (!Number.isSafeInteger(max) || max < min))) return null
+  return { min, max }
 }
 
 function unique(values: readonly string[]): string[] {
@@ -126,6 +162,7 @@ export function toCatalogItem(source: CatalogItemSource): CatalogItem {
     name: source.name,
     price: cardPrice(stockProduct),
     status: productStatus(stockProduct),
+    hasStock: totalStock(stockProduct) > 0,
     categorySlugs,
     sizes,
     colors,
@@ -166,14 +203,48 @@ export function availableFacets(items: readonly CatalogItem[]): { talles: string
   return { talles, colores }
 }
 
+/**
+ * Divide los precios observados en hasta tres grupos contiguos por cuantiles.
+ * Los límites nacen de valores reales; no hay escalones de precio de ejemplo.
+ */
+export function availablePriceRanges(items: readonly CatalogItem[]): CatalogPriceRange[] {
+  const prices = [...new Set(items.map((item) => item.price).filter(Number.isFinite))]
+    .sort((a, b) => a - b)
+  if (prices.length < 2) return []
+
+  const groupCount = Math.min(3, prices.length)
+  const groups: number[][] = []
+  for (let index = 0; index < groupCount; index += 1) {
+    const start = Math.floor(index * prices.length / groupCount)
+    const end = Math.floor((index + 1) * prices.length / groupCount)
+    groups.push(prices.slice(start, end))
+  }
+
+  return groups.map((group, index) => {
+    const min = index === 0 ? 0 : group[0]
+    const max = index === groupCount - 1 ? null : group[group.length - 1]
+    const previousMax = index > 0 ? groups[index - 1][groups[index - 1].length - 1] : null
+    const label = index === 0
+      ? `Hasta ${formatArs(max ?? group[group.length - 1])}`
+      : index === groupCount - 1
+        ? `Más de ${formatArs(previousMax ?? group[0])}`
+        : `${formatArs(min)} a ${formatArs(max ?? group[group.length - 1])}`
+    const id = `${min}-${max === null ? '*' : max}`
+    return { id, min, max, label }
+  })
+}
+
 export function parseCatalogQuery(search: string): CatalogQuery {
   const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search)
   const orden = params.get('orden')
+  const precio = params.get('precio')
   return {
     q: (params.get('q') ?? '').trim(),
     categorias: unique(params.getAll('categoria')),
     talles: unique(params.getAll('talle')),
     colores: unique(params.getAll('color')),
+    precio: parsePriceRangeId(precio) ? precio : null,
+    soloConStock: params.get('stock') === '1',
     orden: isCatalogSort(orden) ? orden : 'mas-nuevos',
   }
 }
@@ -186,6 +257,8 @@ export function serializeCatalogQuery(query: CatalogQuery): string {
   for (const slug of unique(query.categorias)) params.append('categoria', slug)
   for (const size of unique(query.talles)) params.append('talle', size)
   for (const color of unique(query.colores)) params.append('color', color)
+  if (query.precio && parsePriceRangeId(query.precio)) params.set('precio', query.precio)
+  if (query.soloConStock) params.set('stock', '1')
   if (query.orden !== 'mas-nuevos') params.set('orden', query.orden)
   const text = params.toString()
   return text ? `?${text}` : ''
@@ -196,12 +269,15 @@ export function isCatalogQueryActive(query: CatalogQuery): boolean {
     || query.categorias.length > 0
     || query.talles.length > 0
     || query.colores.length > 0
+    || query.precio !== null
+    || query.soloConStock
     || query.orden !== 'mas-nuevos'
 }
 
 /** Deja el orden de entrada. No mira el stock. */
 export function filterCatalog(items: readonly CatalogItem[], query: CatalogQuery): CatalogItem[] {
   const q = normalizeText(query.q)
+  const priceRange = parsePriceRangeId(query.precio)
   return items.filter((item) => {
     if (q && !normalizeText(item.name).includes(q)) return false
     if (query.categorias.length > 0 && !query.categorias.some((slug) => item.categorySlugs.includes(slug))) {
@@ -211,8 +287,56 @@ export function filterCatalog(items: readonly CatalogItem[], query: CatalogQuery
     if (query.colores.length > 0 && !query.colores.some((color) => item.colors.some((entry) => entry.name === color))) {
       return false
     }
+    if (priceRange && (item.price < priceRange.min || (priceRange.max !== null && item.price > priceRange.max))) {
+      return false
+    }
+    if (query.soloConStock && !item.hasStock) return false
     return true
   })
+}
+
+function withoutFacet(query: CatalogQuery, facet: keyof CatalogOptionCounts): CatalogQuery {
+  const copy = { ...query }
+  if (facet === 'categorias') copy.categorias = []
+  else if (facet === 'talles') copy.talles = []
+  else if (facet === 'colores') copy.colores = []
+  else copy.precio = null
+  return copy
+}
+
+/**
+ * Cuenta cada alternativa en vivo, respetando el resto de los filtros y
+ * dejando fuera solamente la selección de esa misma faceta.
+ */
+export function catalogOptionCounts(
+  items: readonly CatalogItem[],
+  query: CatalogQuery,
+  priceRanges: readonly CatalogPriceRange[],
+  categories: readonly { slug: string, name: string }[],
+): CatalogOptionCounts {
+  const categoryItems = filterCatalog(items, withoutFacet(query, 'categorias'))
+  const sizeItems = filterCatalog(items, withoutFacet(query, 'talles'))
+  const colorItems = filterCatalog(items, withoutFacet(query, 'colores'))
+  const priceItems = filterCatalog(items, withoutFacet(query, 'precios'))
+
+  return {
+    categorias: Object.fromEntries(categories.map(({ slug }) => [
+      slug,
+      categoryItems.filter((item) => item.categorySlugs.includes(slug)).length,
+    ])),
+    talles: Object.fromEntries(availableFacets(items).talles.map((size) => [
+      size,
+      sizeItems.filter((item) => item.sizes.includes(size)).length,
+    ])),
+    colores: Object.fromEntries(availableFacets(items).colores.map(({ name }) => [
+      name,
+      colorItems.filter((item) => item.colors.some((color) => color.name === name)).length,
+    ])),
+    precios: Object.fromEntries(priceRanges.map(({ id, min, max }) => [
+      id,
+      priceItems.filter((item) => item.price >= min && (max === null || item.price <= max)).length,
+    ])),
+  }
 }
 
 function timestamp(value: string): number {

@@ -18,7 +18,7 @@ const categorias = await getCollection('categories')
 const nombre = (await getCollection('tienda'))[0]?.data.nombre.trim() || 'Tienda'
 ---
 
-<Base title={`${nombre} — página ${page.currentPage}`} description={`Catálogo de ${nombre}.`}>
+<Base title={`${nombre} — página ${page.currentPage}`} description={`Catálogo de ${nombre}.`} catalogo>
   <Catalogo
     products={page.data.map((entry) => entry.data)}
     catalog={productos.map((entry) => entry.data)}

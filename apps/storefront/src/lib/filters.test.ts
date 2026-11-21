@@ -1,11 +1,15 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { cardPrice } from './catalog.ts'
+import { formatArs } from './stock.ts'
 import {
   applyCatalog,
   availableFacets,
+  availablePriceRanges,
+  catalogOptionCounts,
   categoryChoices,
   filterCatalog,
+  emptyCatalogQuery,
   isCatalogQueryActive,
   normalizeText,
   parseCatalogQuery,
@@ -20,6 +24,7 @@ function item(partial: Partial<CatalogItem> & Pick<CatalogItem, 'slug' | 'name'>
     name: partial.name,
     price: partial.price ?? 1000,
     status: partial.status ?? 'disponible',
+    hasStock: partial.hasStock ?? partial.status !== 'sin-stock',
     categorySlugs: partial.categorySlugs ?? [],
     sizes: partial.sizes ?? [],
     colors: partial.colors ?? [],
@@ -205,6 +210,50 @@ describe('categorías y facetas', () => {
     ])
     assert.deepEqual(primero.colores, [{ name: 'Rosa', hex: '#111111' }])
   })
+
+  it('deriva hasta tres rangos de los precios reales del catálogo', () => {
+    const ranges = availablePriceRanges(catalogo)
+    assert.deepEqual(ranges.map(({ id, min, max }) => ({ id, min, max })), [
+      { id: '0-7500', min: 0, max: 7500 },
+      { id: '18900-18900', min: 18900, max: 18900 },
+      { id: '24000-*', min: 24000, max: null },
+    ])
+    assert.equal(ranges[0].label, `Hasta ${formatArs(7500)}`)
+    assert.deepEqual(availablePriceRanges([item({ slug: 'a', name: 'A', price: 100 })]), [])
+  })
+
+  it('cuenta opciones usando los productos y los demás filtros activos', () => {
+    const counts = catalogOptionCounts(
+      catalogo,
+      {
+        ...emptyCatalogQuery(),
+        categorias: ['bodies'],
+        soloConStock: true,
+      },
+      availablePriceRanges(catalogo),
+      [
+        { slug: 'bodies', name: 'Bodies' },
+        { slug: 'accesorios', name: 'Accesorios' },
+        { slug: 'sin-productos', name: 'Sin productos' },
+      ],
+    )
+
+    assert.deepEqual(counts.categorias, { bodies: 2, accesorios: 2, 'sin-productos': 0 })
+    assert.deepEqual(counts.talles, { '0-3 m': 1, '3-6 m': 2, '6-9 m': 1, '9-12 m': 1, 'Talle único': 0 })
+    assert.deepEqual(counts.colores, {
+      Crudo: 1,
+      'Rosa viejo': 1,
+      Celeste: 1,
+      Natural: 0,
+      Gris: 0,
+      'Verde salvia': 1,
+    })
+    assert.deepEqual(counts.precios, {
+      '0-7500': 0,
+      '18900-18900': 1,
+      '24000-*': 1,
+    })
+  })
 })
 
 describe('consulta', () => {
@@ -217,6 +266,8 @@ describe('consulta', () => {
     assert.deepEqual(query.talles, ['0-3 m', '3-6 m'])
     assert.deepEqual(query.colores, ['Rosa viejo'])
     assert.equal(query.orden, 'mas-nuevos')
+    assert.equal(query.precio, null)
+    assert.equal(query.soloConStock, false)
     assert.equal(isCatalogQueryActive(query), true)
     assert.equal(isCatalogQueryActive(parseCatalogQuery('')), false)
     assert.equal(isCatalogQueryActive(parseCatalogQuery('?orden=mas-nuevos')), false)
@@ -237,6 +288,17 @@ describe('consulta', () => {
       colores: [],
       orden: 'mas-nuevos',
     }), '')
+  })
+
+  it('lee, serializa y limpia precio y disponibilidad', () => {
+    const query = parseCatalogQuery('?precio=10000-20000&stock=1')
+    assert.equal(query.precio, '10000-20000')
+    assert.equal(query.soloConStock, true)
+    assert.equal(serializeCatalogQuery(query), '?precio=10000-20000&stock=1')
+    assert.equal(parseCatalogQuery('?precio=incorrecto&stock=0').precio, null)
+    assert.equal(parseCatalogQuery('?precio=20000-10000').precio, null)
+    assert.equal(parseCatalogQuery('?precio=10000-*').precio, '10000-*')
+    assert.equal(isCatalogQueryActive(query), true)
   })
 })
 
@@ -333,6 +395,32 @@ describe('filtrar', () => {
       orden: 'mas-nuevos',
     })
     assert.deepEqual(slugs(porTalle), ['manta'])
+  })
+
+  it('filtra por rangos de precio derivados del catálogo y solo con stock', () => {
+    const ranges = availablePriceRanges(catalogo)
+    assert.deepEqual(
+      slugs(filterCatalog(catalogo, { ...emptyCatalogQuery(), precio: ranges[0].id })),
+      ['gorrito'],
+    )
+    assert.deepEqual(
+      slugs(filterCatalog(catalogo, { ...emptyCatalogQuery(), precio: ranges[2].id })),
+      ['manta', 'body-bordado'],
+    )
+
+    const disponibles = filterCatalog(catalogo, { ...emptyCatalogQuery(), soloConStock: true })
+    assert.deepEqual(slugs(disponibles), ['body-de-algodon', 'gorrito', 'body-bordado'])
+
+    const piezaUnicaAgotada = item({
+      slug: 'unica-agotada',
+      name: 'Única agotada',
+      status: 'pieza-unica',
+      hasStock: false,
+    })
+    assert.deepEqual(
+      slugs(filterCatalog([...catalogo, piezaUnicaAgotada], { ...emptyCatalogQuery(), soloConStock: true })),
+      ['body-de-algodon', 'gorrito', 'body-bordado'],
+    )
   })
 
   it('no reordena al filtrar y no toca la lista original', () => {

@@ -5,9 +5,10 @@ import '../styles/global.css'
 interface Props {
   title: string
   description?: string
+  catalogo?: boolean
 }
 
-const { title, description } = Astro.props
+const { title, description, catalogo = false } = Astro.props
 
 const tienda = (await getCollection('tienda'))[0]?.data
 const nombreTienda = tienda?.nombre.trim() || 'Tienda'
@@ -33,15 +34,23 @@ const resumen = description?.trim() || nombreTienda
     >
       Saltar al contenido principal
     </a>
-    <header class="border-b border-borde bg-superficie">
-      <div class="contenedor flex min-h-comodo items-center justify-between">
+    <header
+      class:list={[
+        catalogo ? 'bg-fondo' : 'border-b border-borde bg-superficie',
+      ]}
+      style={catalogo ? '--color-acento: #A3441C;' : undefined}
+    >
+      <div class:list={['contenedor flex items-center justify-between', catalogo ? 'min-h-[56px]' : 'min-h-comodo']}>
         <a href="/" class="texto-titulo inline-flex min-h-minimo items-center text-texto no-underline">
           {nombreTienda}
         </a>
         <a
           href="/carrito"
           data-carrito-enlace
-          class="relative inline-flex size-minimo shrink-0 items-center justify-center text-texto no-underline"
+          class:list={[
+            'relative inline-flex shrink-0 items-center justify-center text-texto no-underline',
+            catalogo ? 'size-12' : 'size-minimo',
+          ]}
           aria-label="Carrito"
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
