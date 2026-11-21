@@ -1,6 +1,6 @@
 # Mini Gonzi — CMS
 
-Este proyecto es el CMS de la tienda Mini Gonzi. Corre [Strapi](https://strapi.io) 5.62.0. Ahí cargás productos, categorías, variantes, conjuntos y promociones. La tienda en sí es otra app, en Astro: [mi-emprendimiento](https://github.com/gaCorvalan/mi-emprendimiento). Esa app lee esta API; este CMS no la llama.
+Este proyecto es el CMS de la tienda Mini Gonzi. Corre [Strapi](https://strapi.io) 5.62.0. Ahí cargás productos, categorías, variantes, conjuntos y promociones. La tienda en sí es otra app, en Astro: [`apps/storefront`](../storefront/README.md). Esa app lee esta API; este CMS no la llama.
 
 ## Tipos de contenido
 
@@ -58,7 +58,7 @@ Cloudinary (`CLOUDINARY_NAME`, `CLOUDINARY_KEY`, `CLOUDINARY_SECRET`) es el luga
 
 ## Cómo se conecta con la tienda
 
-[mi-emprendimiento](https://github.com/gaCorvalan/mi-emprendimiento) usa la variable `STRAPI_URL` (si no está, usa `http://localhost:1337`). Al construir el sitio, `src/lib/strapi-loader.ts` hace:
+La tienda en [`apps/storefront`](../storefront/README.md) usa la variable `STRAPI_URL` (si no está, usa `http://localhost:1337`). Al construir el sitio, `src/lib/strapi-loader.ts` hace:
 
 - `GET {STRAPI_URL}/api/products?populate=*`
 - `GET {STRAPI_URL}/api/categories?populate=*`
@@ -67,9 +67,10 @@ Esos datos alimentan las colecciones de Astro (productos y categorías). Por eso
 
 ## Probar todo junto
 
-El CMS y la tienda van en carpetas distintas. En este proyecto:
+El CMS y la tienda viven en carpetas distintas. Desde la raíz del monorepo, para iniciar el CMS:
 
 ```bash
+cd apps/cms
 nvm use
 npm ci
 cp .env.example .env
@@ -84,8 +85,11 @@ npm run seed
 
 Eso publica 2 categorías y 4 productos de ejemplo, con variantes. Uno no tiene imagen. El body de algodón tiene varios talles y colores: una combinación queda en 1 (última unidad) y otra en 0. El gorrito es "Talle único". La manta tiene todas las variantes en 0. El body bordado es pieza única, con una sola variante y stock 1. También publica la Tienda: nombre "Mini Gonzi", texto de envío "A coordinar", moneda "ARS" y el WhatsApp vacío. Si lo corrés de nuevo, no duplica. La lectura pública ya quedó hecha al arrancar; el seed no toca permisos. La primera vez, si todavía no creaste el administrador, el script lo crea y te muestra el email y la clave. Quedan en `.tmp/seed-admin.json`. Si el administrador ya existía, poné `SEED_ADMIN_EMAIL` y `SEED_ADMIN_PASSWORD` en el `.env`.
 
-En [mi-emprendimiento](https://github.com/gaCorvalan/mi-emprendimiento):
+En otra terminal, desde la raíz del monorepo, levantá la tienda en [`apps/storefront`](../storefront/README.md):
 
 ```bash
+cd apps/storefront
+nvm use
+npm ci
 STRAPI_URL=http://localhost:1337 npm run build && npm run preview
 ```

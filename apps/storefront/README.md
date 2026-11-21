@@ -2,7 +2,7 @@
 
 Esta app es la vidriera de Mini Gonzi (ropa de bebé). Es un sitio estático hecho con Astro 7: al armar el sitio lee el catálogo del CMS y deja las páginas listas. No hay servidor de la tienda en producción; el visitante recibe HTML.
 
-El CMS es otro proyecto, [gonzi-store-cms](https://github.com/gaCorvalan/gonzi-store-cms) (Strapi 5). Ahí se cargan los productos y las categorías. Esta tienda no escribe en el CMS: solo lo lee cuando hacés `npm run dev` o `npm run build`.
+El CMS vive en [`apps/cms`](../cms/README.md) y corre Strapi 5. Ahí se cargan los productos y las categorías. Esta tienda no escribe en el CMS: solo lo lee cuando hacés `npm run dev` o `npm run build`.
 
 ## Cómo se conecta al CMS
 
@@ -24,9 +24,10 @@ Un cambio de stock, de precio o del número de WhatsApp en el CMS queda en el HT
 
 ## El CMS, primero
 
-En una carpeta aparte, con el repo [gonzi-store-cms](https://github.com/gaCorvalan/gonzi-store-cms):
+Desde la raíz del monorepo, entrá a `apps/cms`:
 
 ```bash
+cd apps/cms
 npm ci
 cp .env.example .env
 npm run develop

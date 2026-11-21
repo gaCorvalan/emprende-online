@@ -2,7 +2,7 @@
 
 El sitio es estático. En el build, Astro lee el CMS y deja las páginas en HTML. El visitante no llama a Strapi.
 
-El CMS es otro repo: [gonzi-store-cms](https://github.com/gaCorvalan/gonzi-store-cms) (Strapi 5). Esta tienda solo lo lee.
+El CMS vive en [`apps/cms`](../../cms/README.md) y corre Strapi 5. Esta tienda solo lo lee.
 
 ## Qué baja el build
 
